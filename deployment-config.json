@@ -1,0 +1,37 @@
+{
+  "environments": {
+    "us-east-1": {
+      "region": "us-east-1",
+      "stackName": "aws-governance-demos-staging",
+      "environment": "staging",
+      "status": "deployed",
+      "notes": "Original working deployment"
+    },
+    "us-west-2": {
+      "region": "us-west-2",
+      "stackName": "aws-agent-governance-demos-usw2",
+      "environment": "staging",
+      "status": "deployed-with-adhoc-fixes",
+      "adhocFixes": [
+        "IAM: Updated SNSNotificationLambdaRole with wildcard sns:* and dynamodb:* permissions"
+      ],
+      "notes": "Test deployment with manual IAM fixes"
+    },
+    "us-east-2": {
+      "region": "us-east-2",
+      "stackName": "aws-agent-governance-demos-use2",
+      "environment": "staging",
+      "status": "not-deployed",
+      "notes": "Clean deployment target"
+    }
+  },
+  "parameters": {
+    "lambdaMemorySize": 512,
+    "lambdaTimeout": 30,
+    "apiGatewayRateLimit": 100,
+    "apiGatewayBurstLimit": 200,
+    "neptuneMinCapacity": 2.5,
+    "neptuneMaxCapacity": 4.5,
+    "logLevel": "INFO"
+  }
+}

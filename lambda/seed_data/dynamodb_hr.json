@@ -1,0 +1,34 @@
+{
+  "sensitive_records": [
+    {
+      "record_id": "HR-001",
+      "employee_name": "Alice Chen",
+      "government_id": "A12345678",
+      "salary": 125000,
+      "department": "Engineering",
+      "location": "APAC",
+      "hire_date": "2022-06-01",
+      "employment_type": "contractor"
+    },
+    {
+      "record_id": "HR-002",
+      "employee_name": "James Wilson",
+      "government_id": "B98765432",
+      "salary": 95000,
+      "department": "Marketing",
+      "location": "APAC",
+      "hire_date": "2021-03-15",
+      "employment_type": "contractor"
+    },
+    {
+      "record_id": "HR-003",
+      "employee_name": "Maria Garcia",
+      "government_id": "C55566677",
+      "salary": 110000,
+      "department": "Operations",
+      "location": "APAC",
+      "hire_date": "2020-09-01",
+      "employment_type": "contractor"
+    }
+  ]
+}

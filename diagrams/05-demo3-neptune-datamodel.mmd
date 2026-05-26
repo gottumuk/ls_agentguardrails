@@ -1,0 +1,31 @@
+graph TB
+    subgraph "Account Nodes"
+        A1[ACCT-001 - type: account - status: active]
+        A2[ACCT-002 - type: account - status: active]
+        A3[ACCT-003 - type: account - status: flagged]
+    end
+    
+    subgraph "Entity Nodes - Shared Attributes"
+        E1[ENTITY-123 - type: shared_phone]
+        E2[ENTITY-456 - type: shared_address]
+        E3[ENTITY-789 - type: shared_email]
+    end
+    
+    subgraph "Risk Cluster Nodes"
+        RC1[RISK-CLUSTER-001 - type: fraud_ring - risk_level: HIGH]
+    end
+    
+    A1 -->|CONNECTED_TO - 1-hop| E1
+    A2 -->|CONNECTED_TO - 1-hop| E2
+    A3 -->|CONNECTED_TO - 1-hop| E1
+    
+    E1 -->|CONNECTED_TO - 2-hop| RC1
+    E3 -->|CONNECTED_TO - 2-hop| RC1
+    
+    style A1 fill:#e1f5ff
+    style A2 fill:#e1f5ff
+    style A3 fill:#ffe6e6
+    style E1 fill:#fff4cc
+    style E2 fill:#fff4cc
+    style E3 fill:#fff4cc
+    style RC1 fill:#ffcccc

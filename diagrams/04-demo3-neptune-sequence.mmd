@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant APIGW as API Gateway
+    participant Lambda as Neptune Lambda
+    participant Neptune as Amazon Neptune
+    participant DDB as DynamoDB (AuditTrail)
+    participant CW as CloudWatch Logs
+    
+    User->>Frontend: Calculate trust score
+    Frontend->>APIGW: POST /neptune/score
+    APIGW->>Lambda: Invoke with payload
+    
+    Note over Lambda: Build Gremlin query
+    
+    Lambda->>Neptune: Execute Gremlin Query
+    
+    Note over Neptune: Graph traversal - 2-hop connection found
+    
+    Neptune-->>Lambda: Return paths (50-100ms)
+    
+    Note over Lambda: Calculate trust score
+    
+    Lambda->>DDB: PutItem - Log scoring
+    DDB-->>Lambda: Success
+    
+    Lambda->>CW: Log query metrics
+    
+    Lambda-->>APIGW: Return trust score
+    APIGW-->>Frontend: 200 OK
+    Frontend-->>User: Display graph visualization
+    
+    Note over User,CW: Total latency: 50-150ms

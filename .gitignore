@@ -1,0 +1,138 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+.virtualenv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# Frontend Build
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# AWS
+.aws-sam/
+samconfig.toml
+cdk.out/
+.cdk.staging/
+
+# CloudFormation Outputs
+cloudformation/outputs/
+stack-outputs.json
+deployment-outputs.json
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Deployment Artifacts
+lambda-packages/
+lambda/*.zip
+deployment-package.zip
+layers/python/
+layers/*.zip
+
+# Diagrams (generated)
+diagrams/*.png
+diagrams-python/*.png
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Secrets and Credentials
+secrets.json
+credentials.json
+config.local.json
+*-secrets.yaml
+*-credentials.yaml
+
+# CloudFormation Stack Files (generated during deployment)
+*-stack-id.txt
+*-stack-status.txt
+
+# Neptune Connection Info
+neptune-endpoint.txt
+neptune-connection.json
+
+# Local Testing
+test-results/
+.test-output/
+
+# Documentation (optional - uncomment if you don't want to track generated docs)
+# *.pdf
+# GENERATED_*.md
+
+# Blog posts
+agent_guardrails_blog.*
+3.31.guardrails.*
+agent_autonomy_outline_v2.docx

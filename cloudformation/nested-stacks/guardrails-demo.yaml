@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Demo 2 - Guardrails Data Protection'
+
+Parameters:
+  AuditTrailTableName:
+    Type: String
+  SensitiveRecordsTableName:
+    Type: String
+  Environment:
+    Type: String
+  LambdaCodeBucket:
+    Type: String
+  LambdaMemorySize:
+    Type: Number
+  LambdaTimeout:
+    Type: Number
+  LogLevel:
+    Type: String
+  BankingGuardrailId:
+    Type: String
+    Description: Banking Guardrail ID from guardrails-policies stack
+  HealthcareGuardrailId:
+    Type: String
+    Description: Healthcare Guardrail ID from guardrails-policies stack
+  RetailGuardrailId:
+    Type: String
+    Description: Retail Guardrail ID from guardrails-policies stack
+  HRGuardrailId:
+    Type: String
+    Description: HR Guardrail ID from guardrails-policies stack
+
+Resources:
+  GuardrailsQueryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SensitiveRecordsTableName}'
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AuditTrailTableName}'
+        - PolicyName: BedrockGuardrails
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:ApplyGuardrail
+                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/*'
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*'
+
+  GuardrailsLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${GuardrailsQueryLambda}'
+      RetentionInDays: 7
+
+  GuardrailsQueryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: guardrails_query.lambda_handler
+      Role: !GetAtt GuardrailsQueryLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/guardrails_query.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          AUDIT_TRAIL_TABLE: !Ref AuditTrailTableName
+          SENSITIVE_RECORDS_TABLE: !Ref SensitiveRecordsTableName
+          LOG_LEVEL: !Ref LogLevel
+          ENVIRONMENT: !Ref Environment
+          BANKING_GUARDRAIL_ID: !Ref BankingGuardrailId
+          HEALTHCARE_GUARDRAIL_ID: !Ref HealthcareGuardrailId
+          RETAIL_GUARDRAIL_ID: !Ref RetailGuardrailId
+          HR_GUARDRAIL_ID: !Ref HRGuardrailId
+
+Outputs:
+  GuardrailsLambdaArn:
+    Value: !GetAtt GuardrailsQueryLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-GuardrailsLambdaArn'

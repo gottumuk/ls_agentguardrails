@@ -1,0 +1,89 @@
+graph TB
+    subgraph "Client Layer"
+        UI[React Frontend - Industry Context Switcher]
+    end
+    
+    subgraph "CDN Layer"
+        CF[CloudFront - Static Asset Distribution]
+    end
+    
+    subgraph "API Layer"
+        APIGW[API Gateway - REST API]
+    end
+    
+    subgraph "Compute Layer"
+        L1[Lambda: TACT Evaluation]
+        L2[Lambda: Guardrails Query]
+        L3[Lambda: Neptune Scoring]
+        L4[Lambda: Approval Workflow]
+        L5[Lambda: SNS Notification]
+        L6[Lambda: Approval Decision]
+    end
+    
+    subgraph "AI/ML Services"
+        BR[Amazon Bedrock - Claude Sonnet 4.5]
+        GR[Bedrock Guardrails - PII/PHI/PCI Redaction]
+    end
+    
+    subgraph "Data Layer"
+        NP[Amazon Neptune - Graph Database]
+        DB1[DynamoDB: SensitiveRecords]
+        DB2[DynamoDB: AuditTrail]
+        DB3[DynamoDB: WorkflowState]
+    end
+    
+    subgraph "Orchestration Layer"
+        SF[AWS Step Functions - Approval State Machine]
+        SNS[Amazon SNS - Notification Topic]
+    end
+    
+    subgraph "Observability"
+        CW[CloudWatch Logs]
+        CT[CloudTrail]
+    end
+    
+    UI -->|HTTPS| CF
+    CF -->|Origin Request| APIGW
+    APIGW -->|Invoke| L1
+    APIGW -->|Invoke| L2
+    APIGW -->|Invoke| L3
+    APIGW -->|Invoke| L4
+    APIGW -->|Invoke| L6
+    
+    L1 -->|InvokeModel| BR
+    L1 -->|PutItem| DB2
+    
+    L2 -->|GetItem| DB1
+    L2 -->|ApplyGuardrail| GR
+    
+    L3 -->|Gremlin Query| NP
+    L3 -->|PutItem| DB2
+    
+    L4 -->|StartExecution| SF
+    L4 -->|PutItem| DB3
+    
+    SF -->|Invoke| L5
+    L5 -->|Publish| SNS
+    L5 -->|PutItem| DB3
+    
+    L6 -->|SendTaskSuccess| SF
+    L6 -->|PutItem| DB2
+    
+    L1 -.->|Logs| CW
+    L2 -.->|Logs| CW
+    L3 -.->|Logs| CW
+    L4 -.->|Logs| CW
+    L5 -.->|Logs| CW
+    L6 -.->|Logs| CW
+    SF -.->|Logs| CW
+    
+    APIGW -.->|API Calls| CT
+    
+    style UI fill:#e1f5ff
+    style BR fill:#e8d5f2
+    style GR fill:#e8d5f2
+    style NP fill:#fff4cc
+    style SF fill:#cce5ff
+    style DB1 fill:#d4f1d4
+    style DB2 fill:#d4f1d4
+    style DB3 fill:#d4f1d4

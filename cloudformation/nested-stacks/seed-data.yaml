@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Seed Data Lambda and Custom Resource for AWS Agent Governance Demos'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+  
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment packages
+  
+  LambdaMemorySize:
+    Type: Number
+    Default: 1024
+    Description: Lambda function memory size in MB
+  
+  LambdaTimeout:
+    Type: Number
+    Default: 300
+    Description: Lambda function timeout in seconds (5 minutes for seeding)
+  
+  SensitiveRecordsTableName:
+    Type: String
+    Description: Name of the SensitiveRecords DynamoDB table
+  
+  NeptuneEndpoint:
+    Type: String
+    Description: Neptune cluster endpoint
+  
+  NeptunePort:
+    Type: Number
+    Default: 8182
+    Description: Neptune port
+  
+  VpcId:
+    Type: String
+    Description: VPC ID for Lambda
+  
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+    Description: Private subnet IDs for Lambda
+  
+  NeptuneSecurityGroupId:
+    Type: String
+    Description: Security group ID for Neptune access
+
+Resources:
+  # IAM Role for Seed Data Lambda
+  SeedDataLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: SeedDataPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # DynamoDB permissions
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SensitiveRecordsTableName}'
+              
+              # Neptune permissions
+              - Effect: Allow
+                Action:
+                  - neptune-db:connect
+                  - neptune-db:ReadDataViaQuery
+                  - neptune-db:WriteDataViaQuery
+                Resource: '*'
+              
+              # S3 permissions for CloudFormation response
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: 'arn:aws:s3:::cloudformation-custom-resource-response-*/*'
+              
+              # CloudWatch Logs permissions
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-SeedData*'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Security Group for Seed Data Lambda
+  SeedDataLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Seed Data Lambda
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Allow Lambda to access Neptune
+  NeptuneIngressFromLambda:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref NeptuneSecurityGroupId
+      IpProtocol: tcp
+      FromPort: !Ref NeptunePort
+      ToPort: !Ref NeptunePort
+      SourceSecurityGroupId: !Ref SeedDataLambdaSecurityGroup
+
+  # Seed Data Lambda Function
+  SeedDataLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: seed_data.lambda_handler
+      Role: !GetAtt SeedDataLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/seed_data.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          SENSITIVE_RECORDS_TABLE: !Ref SensitiveRecordsTableName
+          NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
+          NEPTUNE_PORT: !Ref NeptunePort
+          ENVIRONMENT: !Ref Environment
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SeedDataLambdaSecurityGroup
+        SubnetIds: !Ref PrivateSubnetIds
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudWatch Log Group
+  SeedDataLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SeedDataLambda}'
+      RetentionInDays: 7
+
+  # Custom Resource to trigger seeding on stack creation
+  SeedDataCustomResource:
+    Type: Custom::SeedData
+    DependsOn:
+      - SeedDataLambda
+      - SeedDataLogGroup
+    Properties:
+      ServiceToken: !GetAtt SeedDataLambda.Arn
+      Industries:
+        - Banking
+        - Healthcare
+        - Retail
+        - HROperations
+      # Force update on stack update by including timestamp
+      Timestamp: !Sub '${AWS::StackName}-${Environment}'
+
+Outputs:
+  SeedDataLambdaArn:
+    Description: ARN of the Seed Data Lambda function
+    Value: !GetAtt SeedDataLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-SeedDataLambdaArn'
+  
+  SeedDataLambdaName:
+    Description: Name of the Seed Data Lambda function
+    Value: !Ref SeedDataLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-SeedDataLambdaName'
+  
+  SeedDataCustomResourceId:
+    Description: Custom resource ID for seed data
+    Value: !Ref SeedDataCustomResource

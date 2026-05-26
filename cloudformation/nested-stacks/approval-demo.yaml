@@ -1,0 +1,399 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Demo 4 - Human-in-the-Loop Approval Workflow'
+
+Parameters:
+  AuditTrailTableName:
+    Type: String
+  WorkflowStateTableName:
+    Type: String
+  Environment:
+    Type: String
+  LambdaCodeBucket:
+    Type: String
+  LambdaMemorySize:
+    Type: Number
+  LambdaTimeout:
+    Type: Number
+  LogLevel:
+    Type: String
+
+Resources:
+  # SNS Topic for Approval Notifications
+  ApprovalNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-ApprovalNotifications'
+      DisplayName: Approval Notifications for Agent Governance Demos
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # IAM Role for Step Functions
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt AuditTrailLambda.Arn
+                  - !GetAtt SNSNotificationLambda.Arn
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: '*'
+
+  # IAM Role for Audit Trail Lambda
+  AuditTrailLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AuditTrailTableName}'
+
+  # IAM Role for SNS Notification Lambda
+  SNSNotificationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SNSPublish
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:*
+                Resource: '*'
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource: '*'
+
+  # IAM Role for Approval Workflow Lambda
+  ApprovalWorkflowLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: StepFunctionsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                  - states:GetExecutionHistory
+                  - states:SendTaskSuccess
+                  - states:SendTaskFailure
+                Resource: !GetAtt ApprovalStateMachine.Arn
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WorkflowStateTableName}'
+
+  # IAM Role for Approval Decision Lambda
+  ApprovalDecisionLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: StepFunctionsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:SendTaskSuccess
+                  - states:SendTaskFailure
+                Resource: !GetAtt ApprovalStateMachine.Arn
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AuditTrailTableName}'
+
+  # Lambda Functions
+  AuditTrailLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: audit_trail.lambda_handler
+      Role: !GetAtt AuditTrailLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/audit_trail.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          AUDIT_TRAIL_TABLE: !Ref AuditTrailTableName
+          LOG_LEVEL: !Ref LogLevel
+
+  SNSNotificationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: sns_notification.lambda_handler
+      Role: !GetAtt SNSNotificationLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/sns_notification.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref ApprovalNotificationTopic
+          WORKFLOW_STATE_TABLE: !Ref WorkflowStateTableName
+          LOG_LEVEL: !Ref LogLevel
+
+  ApprovalWorkflowLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: approval_workflow.lambda_handler
+      Role: !GetAtt ApprovalWorkflowLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/approval_workflow.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !GetAtt ApprovalStateMachine.Arn
+          WORKFLOW_STATE_TABLE: !Ref WorkflowStateTableName
+          LOG_LEVEL: !Ref LogLevel
+
+  ApprovalDecisionLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: approval_decision.lambda_handler
+      Role: !GetAtt ApprovalDecisionLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/approval_decision.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          AUDIT_TRAIL_TABLE: !Ref AuditTrailTableName
+          LOG_LEVEL: !Ref LogLevel
+
+  # CloudWatch Log Groups
+  AuditTrailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AuditTrailLambda}'
+      RetentionInDays: 90
+
+  SNSNotificationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SNSNotificationLambda}'
+      RetentionInDays: 7
+
+  ApprovalWorkflowLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ApprovalWorkflowLambda}'
+      RetentionInDays: 7
+
+  ApprovalDecisionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ApprovalDecisionLambda}'
+      RetentionInDays: 7
+
+  StepFunctionsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/states/${AWS::StackName}-ApprovalStateMachine'
+      RetentionInDays: 90
+
+  # Step Functions State Machine
+  ApprovalStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub '${Environment}-ApprovalWorkflow'
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      LoggingConfiguration:
+        Level: ALL
+        IncludeExecutionData: true
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt StepFunctionsLogGroup.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Human-in-the-loop approval workflow with timeout",
+          "StartAt": "RecordApprovalRequest",
+          "States": {
+            "RecordApprovalRequest": {
+              "Type": "Task",
+              "Resource": "${AuditTrailLambda.Arn}",
+              "Parameters": {
+                "event_type": "APPROVAL_REQUESTED",
+                "timestamp.$": "$$.Execution.StartTime",
+                "context.$": "$.action_context"
+              },
+              "ResultPath": null,
+              "Next": "WaitForApproval"
+            },
+            "WaitForApproval": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+              "Parameters": {
+                "FunctionName": "${SNSNotificationLambda.Arn}",
+                "Payload": {
+                  "task_token.$": "$$.Task.Token",
+                  "reviewer.$": "$.reviewer",
+                  "action_context.$": "$.action_context",
+                  "industry_context.$": "$.industry_context",
+                  "workflow_id.$": "$.workflow_id"
+                }
+              },
+              "TimeoutSeconds": 900,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.Timeout"],
+                  "ResultPath": "$.error",
+                  "Next": "HandleTimeout"
+                }
+              ],
+              "Next": "ProcessDecision"
+            },
+            "ProcessDecision": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.decision",
+                  "StringEquals": "APPROVE",
+                  "Next": "RecordApproval"
+                },
+                {
+                  "Variable": "$.decision",
+                  "StringEquals": "DENY",
+                  "Next": "RecordDenial"
+                }
+              ],
+              "Default": "RecordDenial"
+            },
+            "RecordApproval": {
+              "Type": "Task",
+              "Resource": "${AuditTrailLambda.Arn}",
+              "Parameters": {
+                "event_type": "APPROVED",
+                "timestamp.$": "$$.Execution.StartTime",
+                "context.$": "$.action_context",
+                "reviewer.$": "$.reviewer_identity"
+              },
+              "End": true
+            },
+            "RecordDenial": {
+              "Type": "Task",
+              "Resource": "${AuditTrailLambda.Arn}",
+              "Parameters": {
+                "event_type": "DENIED",
+                "timestamp.$": "$$.Execution.StartTime",
+                "context.$": "$.action_context",
+                "reviewer.$": "$.reviewer_identity"
+              },
+              "End": true
+            },
+            "HandleTimeout": {
+              "Type": "Task",
+              "Resource": "${AuditTrailLambda.Arn}",
+              "Parameters": {
+                "event_type": "TIMEOUT",
+                "timestamp.$": "$$.Execution.StartTime",
+                "context.$": "$.action_context"
+              },
+              "End": true
+            }
+          }
+        }
+
+Outputs:
+  ApprovalLambdaArn:
+    Value: !GetAtt ApprovalWorkflowLambda.Arn
+  ApprovalDecisionLambdaArn:
+    Value: !GetAtt ApprovalDecisionLambda.Arn
+  StateMachineArn:
+    Value: !GetAtt ApprovalStateMachine.Arn
+  SNSTopicArn:
+    Value: !Ref ApprovalNotificationTopic

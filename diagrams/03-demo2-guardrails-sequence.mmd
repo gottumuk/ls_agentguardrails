@@ -1,0 +1,32 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant APIGW as API Gateway
+    participant Lambda as Guardrails Lambda
+    participant DDB as DynamoDB (SensitiveRecords)
+    participant GR as Bedrock Guardrails
+    participant CW as CloudWatch Logs
+    
+    User->>Frontend: Query banking record
+    Frontend->>APIGW: GET /guardrails/query
+    APIGW->>Lambda: Invoke with payload
+    
+    Lambda->>DDB: GetItem
+    
+    Note over DDB: Raw data with SSN, Account, DOB
+    
+    DDB-->>Lambda: Return raw record (45ms)
+    
+    Lambda->>GR: ApplyGuardrail
+    
+    Note over GR: Detect and redact PII
+    
+    GR-->>Lambda: Sanitized record (120ms)
+    
+    Lambda->>CW: Log query metrics
+    
+    Lambda-->>APIGW: Return sanitized data
+    APIGW-->>Frontend: 200 OK
+    Frontend-->>User: Display before/after
+    
+    Note over User,CW: Total latency: ~165ms

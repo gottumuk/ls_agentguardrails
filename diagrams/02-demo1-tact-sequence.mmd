@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant APIGW as API Gateway
+    participant Lambda as TACT Lambda
+    participant Bedrock as Amazon Bedrock (Claude Sonnet 4.5)
+    participant DDB as DynamoDB (AuditTrail)
+    participant CW as CloudWatch Logs
+    
+    User->>Frontend: Submit action for evaluation
+    Frontend->>APIGW: POST /tact/evaluate
+    APIGW->>Lambda: Invoke with payload
+    
+    Note over Lambda: Build prompt with industry context
+    
+    Lambda->>Bedrock: InvokeModel - TACT evaluation
+    
+    Note over Bedrock: Analyze action across 4 dimensions
+    
+    Bedrock-->>Lambda: JSON Response with scores
+    
+    Lambda->>DDB: PutItem - Log evaluation
+    DDB-->>Lambda: Success
+    
+    Lambda->>CW: Log execution
+    
+    Lambda-->>APIGW: Return evaluation result
+    APIGW-->>Frontend: 200 OK
+    Frontend-->>User: Display results
+    
+    Note over User,CW: Total latency: 800-1200ms

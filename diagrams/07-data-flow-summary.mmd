@@ -1,0 +1,36 @@
+graph TB
+    subgraph "Demo 1: TACT"
+        D1[Frontend] -->|Action| D1L[Lambda]
+        D1L -->|Prompt| D1B[Bedrock]
+        D1B -->|Scores| D1L
+        D1L -->|Audit| D1DB[DynamoDB]
+    end
+    
+    subgraph "Demo 2: Guardrails"
+        D2[Frontend] -->|Query| D2L[Lambda]
+        D2L -->|GetItem| D2DB1[DynamoDB - Raw Data]
+        D2DB1 -->|Unredacted| D2L
+        D2L -->|Apply Policy| D2G[Guardrails]
+        D2G -->|Redacted| D2L
+    end
+    
+    subgraph "Demo 3: Neptune"
+        D3[Frontend] -->|Account ID| D3L[Lambda]
+        D3L -->|Gremlin Query| D3N[Neptune]
+        D3N -->|Paths| D3L
+        D3L -->|Score| D3DB[DynamoDB]
+    end
+    
+    subgraph "Demo 4: Step Functions"
+        D4[Frontend] -->|Start| D4L1[Workflow Lambda]
+        D4L1 -->|Execute| D4SF[Step Functions]
+        D4SF -->|Notify| D4L2[SNS Lambda]
+        D4L2 -->|Store Token| D4DB[DynamoDB]
+        D4[Frontend] -->|Decision| D4L3[Decision Lambda]
+        D4L3 -->|Resume| D4SF
+    end
+    
+    style D1B fill:#e8d5f2
+    style D2G fill:#e8d5f2
+    style D3N fill:#fff4cc
+    style D4SF fill:#cce5ff

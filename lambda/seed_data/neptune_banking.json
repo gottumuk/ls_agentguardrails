@@ -1,0 +1,89 @@
+{
+  "nodes": [
+    {
+      "id": "ACCT-001",
+      "label": "Account",
+      "properties": {
+        "name": "John Smith Account",
+        "type": "checking",
+        "industry_context": "Banking",
+        "created_date": "2020-01-15"
+      }
+    },
+    {
+      "id": "ACCT-002",
+      "label": "Account",
+      "properties": {
+        "name": "Sarah Johnson Account",
+        "type": "savings",
+        "industry_context": "Banking",
+        "created_date": "2019-06-20"
+      }
+    },
+    {
+      "id": "ACCT-003",
+      "label": "Account",
+      "properties": {
+        "name": "Michael Chen Account",
+        "type": "checking",
+        "industry_context": "Banking",
+        "created_date": "2021-03-10"
+      }
+    },
+    {
+      "id": "RISK-FRAUD-001",
+      "label": "RiskCluster",
+      "properties": {
+        "cluster_type": "fraud_cluster",
+        "risk_level": 3,
+        "description": "Known fraud ring involving suspicious wire transfers"
+      }
+    },
+    {
+      "id": "ENTITY-MERCHANT-001",
+      "label": "Entity",
+      "properties": {
+        "name": "Offshore Payment Processor",
+        "entity_type": "merchant"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "ACCT-001",
+      "to": "RISK-FRAUD-001",
+      "label": "LINKED_TO",
+      "properties": {
+        "link_type": "direct_connection",
+        "confidence": 0.95
+      }
+    },
+    {
+      "from": "ACCT-002",
+      "to": "ENTITY-MERCHANT-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 5,
+        "last_interaction": "2024-01-10T14:20:00Z"
+      }
+    },
+    {
+      "from": "ENTITY-MERCHANT-001",
+      "to": "RISK-FRAUD-001",
+      "label": "ASSOCIATED_WITH",
+      "properties": {
+        "distance": 1,
+        "confidence_score": 0.85
+      }
+    },
+    {
+      "from": "ACCT-003",
+      "to": "RISK-FRAUD-001",
+      "label": "LINKED_TO",
+      "properties": {
+        "link_type": "suspicious_pattern",
+        "confidence": 0.75
+      }
+    }
+  ]
+}

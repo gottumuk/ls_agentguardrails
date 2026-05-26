@@ -1,0 +1,57 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant APIGW as API Gateway
+    participant L1 as Approval Workflow Lambda
+    participant SF as Step Functions State Machine
+    participant L2 as SNS Notification Lambda
+    participant SNS as Amazon SNS
+    participant DDB as DynamoDB (WorkflowState)
+    participant L3 as Approval Decision Lambda
+    participant Reviewer as Human Reviewer
+    
+    User->>Frontend: Submit high-risk action
+    Frontend->>APIGW: POST /approval/start
+    APIGW->>L1: Invoke
+    
+    L1->>SF: StartExecution
+    
+    Note over SF: State: RecordApprovalRequest
+    
+    SF->>L2: Invoke with task token
+    
+    Note over SF: State: WaitForApproval - Workflow PAUSED
+    
+    L2->>DDB: PutItem - Store task token
+    DDB-->>L2: Success
+    
+    L2->>SNS: Publish notification
+    SNS-->>Reviewer: Email/SMS notification
+    
+    L2-->>SF: Return (workflow paused)
+    SF-->>L1: Execution started
+    L1-->>APIGW: Return workflow_id
+    APIGW-->>Frontend: 200 OK
+    Frontend-->>User: Display countdown timer
+    
+    Note over Reviewer: Reviews and makes decision
+    
+    Reviewer->>Frontend: Click DENY button
+    Frontend->>APIGW: POST /approval/decide
+    APIGW->>L3: Invoke
+    
+    L3->>SF: SendTaskSuccess
+    
+    Note over SF: State: ProcessDecision - DENY path
+    
+    Note over SF: State: RecordDenial
+    
+    SF->>DDB: PutItem - Record decision
+    DDB-->>SF: Success
+    
+    SF-->>L3: Execution completed
+    L3-->>APIGW: Return result
+    APIGW-->>Frontend: 200 OK
+    Frontend-->>User: Display result - ACTION DENIED
+    
+    Note over User,DDB: Total workflow time: 8.3 seconds

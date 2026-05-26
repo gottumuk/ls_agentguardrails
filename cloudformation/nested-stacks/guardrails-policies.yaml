@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Bedrock Guardrails Policies for Demo 2 - Data Protection'
+
+Resources:
+  # Banking Guardrails Policy
+  BankingGuardrail:
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: banking-pii-policy
+      Description: Guardrails policy for Banking industry - blocks SSN, account numbers, and DOB
+      BlockedInputMessaging: This request contains sensitive banking information that cannot be processed.
+      BlockedOutputsMessaging: This response contains sensitive banking information that cannot be returned.
+      SensitiveInformationPolicyConfig:
+        PiiEntitiesConfig:
+          - Type: US_SOCIAL_SECURITY_NUMBER
+            Action: BLOCK
+          - Type: US_BANK_ACCOUNT_NUMBER
+            Action: BLOCK
+        RegexesConfig:
+          - Name: SSN_Pattern
+            Description: Social Security Number pattern
+            Pattern: '\d{3}-\d{2}-\d{4}'
+            Action: BLOCK
+          - Name: Account_Number_Pattern
+            Description: Bank account number pattern
+            Pattern: '\d{10,12}'
+            Action: BLOCK
+          - Name: DOB_Pattern
+            Description: Date of birth pattern
+            Pattern: '\d{4}-\d{2}-\d{2}'
+            Action: BLOCK
+
+  # Healthcare Guardrails Policy
+  HealthcareGuardrail:
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: healthcare-phi-policy
+      Description: Guardrails policy for Healthcare industry - anonymizes MRN, ICD-10 codes, and prescription history
+      BlockedInputMessaging: This request contains protected health information that cannot be processed.
+      BlockedOutputsMessaging: This response contains protected health information that has been anonymized.
+      SensitiveInformationPolicyConfig:
+        RegexesConfig:
+          - Name: MRN_Pattern
+            Description: Medical Record Number pattern
+            Pattern: 'MRN-\d{6}'
+            Action: ANONYMIZE
+          - Name: ICD10_Pattern
+            Description: ICD-10 code pattern
+            Pattern: '[A-Z]\d{2}\.\d'
+            Action: ANONYMIZE
+      WordPolicyConfig:
+        WordsConfig:
+          - Text: Oxycodone
+          - Text: Hydrocodone
+          - Text: Fentanyl
+          - Text: Morphine
+          - Text: Codeine
+          - Text: Tramadol
+
+  # Retail Guardrails Policy
+  RetailGuardrail:
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: retail-pci-policy
+      Description: Guardrails policy for Retail industry - anonymizes card numbers and CVV
+      BlockedInputMessaging: This request contains payment card information that cannot be processed.
+      BlockedOutputsMessaging: This response contains payment card information that has been anonymized.
+      SensitiveInformationPolicyConfig:
+        PiiEntitiesConfig:
+          - Type: CREDIT_DEBIT_CARD_NUMBER
+            Action: ANONYMIZE
+          - Type: CREDIT_DEBIT_CARD_CVV
+            Action: ANONYMIZE
+        RegexesConfig:
+          - Name: Card_Number_Pattern
+            Description: Credit card number pattern with dashes
+            Pattern: '\d{4}-\d{4}-\d{4}-\d{4}'
+            Action: ANONYMIZE
+          - Name: CVV_Pattern
+            Description: CVV pattern
+            Pattern: '\b\d{3}\b'
+            Action: ANONYMIZE
+
+  # HR/Operations Guardrails Policy
+  HRGuardrail:
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: hr-pii-policy
+      Description: Guardrails policy for HR/Operations industry - anonymizes government ID and salary
+      BlockedInputMessaging: This request contains employee personal information that cannot be processed.
+      BlockedOutputsMessaging: This response contains employee personal information that has been anonymized.
+      SensitiveInformationPolicyConfig:
+        PiiEntitiesConfig:
+          - Type: US_PASSPORT_NUMBER
+            Action: ANONYMIZE
+          - Type: DRIVER_ID
+            Action: ANONYMIZE
+        RegexesConfig:
+          - Name: Government_ID_Pattern
+            Description: Government ID pattern
+            Pattern: '[A-Z]\d{8}'
+            Action: ANONYMIZE
+          - Name: Salary_Pattern
+            Description: Salary amount pattern
+            Pattern: '\$?\d{1,3}(,\d{3})*(\.\d{2})?'
+            Action: ANONYMIZE
+
+Outputs:
+  BankingGuardrailId:
+    Description: Banking Guardrail ID
+    Value: !GetAtt BankingGuardrail.GuardrailId
+    Export:
+      Name: !Sub '${AWS::StackName}-BankingGuardrailId'
+
+  BankingGuardrailArn:
+    Description: Banking Guardrail ARN
+    Value: !GetAtt BankingGuardrail.GuardrailArn
+    Export:
+      Name: !Sub '${AWS::StackName}-BankingGuardrailArn'
+
+  HealthcareGuardrailId:
+    Description: Healthcare Guardrail ID
+    Value: !GetAtt HealthcareGuardrail.GuardrailId
+    Export:
+      Name: !Sub '${AWS::StackName}-HealthcareGuardrailId'
+
+  HealthcareGuardrailArn:
+    Description: Healthcare Guardrail ARN
+    Value: !GetAtt HealthcareGuardrail.GuardrailArn
+    Export:
+      Name: !Sub '${AWS::StackName}-HealthcareGuardrailArn'
+
+  RetailGuardrailId:
+    Description: Retail Guardrail ID
+    Value: !GetAtt RetailGuardrail.GuardrailId
+    Export:
+      Name: !Sub '${AWS::StackName}-RetailGuardrailId'
+
+  RetailGuardrailArn:
+    Description: Retail Guardrail ARN
+    Value: !GetAtt RetailGuardrail.GuardrailArn
+    Export:
+      Name: !Sub '${AWS::StackName}-RetailGuardrailArn'
+
+  HRGuardrailId:
+    Description: HR Guardrail ID
+    Value: !GetAtt HRGuardrail.GuardrailId
+    Export:
+      Name: !Sub '${AWS::StackName}-HRGuardrailId'
+
+  HRGuardrailArn:
+    Description: HR Guardrail ARN
+    Value: !GetAtt HRGuardrail.GuardrailArn
+    Export:
+      Name: !Sub '${AWS::StackName}-HRGuardrailArn'

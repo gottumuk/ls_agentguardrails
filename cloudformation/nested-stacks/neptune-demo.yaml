@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Demo 3 - Neptune Trust Graph'
+
+Parameters:
+  AuditTrailTableName:
+    Type: String
+  Environment:
+    Type: String
+  LambdaCodeBucket:
+    Type: String
+  LambdaMemorySize:
+    Type: Number
+  LambdaTimeout:
+    Type: Number
+  LogLevel:
+    Type: String
+  NeptuneMinCapacity:
+    Type: Number
+  NeptuneMaxCapacity:
+    Type: Number
+
+Resources:
+  # VPC for Neptune
+  NeptuneVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Neptune-VPC'
+
+  # Private Subnets for Neptune
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref NeptuneVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Private-Subnet-1'
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref NeptuneVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Private-Subnet-2'
+
+  # Neptune Subnet Group
+  NeptuneSubnetGroup:
+    Type: AWS::Neptune::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub '${Environment}-neptune-subnet'
+      DBSubnetGroupDescription: Subnet group for Neptune cluster
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  # Security Group for Neptune
+  NeptuneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-Neptune-SG'
+      GroupDescription: Security group for Neptune cluster
+      VpcId: !Ref NeptuneVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8182
+          ToPort: 8182
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Neptune-SG'
+
+  # Security Group for Lambda
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-Lambda-SG'
+      GroupDescription: Security group for Lambda functions accessing Neptune
+      VpcId: !Ref NeptuneVPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Lambda-SG'
+
+  # DynamoDB VPC Endpoint for Lambda access
+  DynamoDBVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref NeptuneVPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # S3 VPC Endpoint for CloudFormation custom resource responses
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref NeptuneVPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # Route Table for Private Subnets
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref NeptuneVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Private-RT'
+
+  # Associate Route Table with Private Subnet 1
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Associate Route Table with Private Subnet 2
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Neptune Serverless Cluster
+  NeptuneCluster:
+    Type: AWS::Neptune::DBCluster
+    DependsOn: NeptuneSubnetGroup
+    DeletionPolicy: Delete
+    Properties:
+      DBSubnetGroupName: !Ref NeptuneSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref NeptuneSecurityGroup
+      ServerlessScalingConfiguration:
+        MinCapacity: !Ref NeptuneMinCapacity
+        MaxCapacity: !Ref NeptuneMaxCapacity
+      IamAuthEnabled: false
+      DeletionProtection: false
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-neptune'
+
+  # Neptune Instance
+  NeptuneInstance:
+    Type: AWS::Neptune::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref NeptuneCluster
+      DBInstanceClass: db.serverless
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # IAM Role for Neptune Scoring Lambda
+  NeptuneScoringLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: NeptuneAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - neptune-db:connect
+                  - neptune-db:ReadDataViaQuery
+                Resource: !Sub 'arn:aws:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneCluster}/*'
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AuditTrailTableName}'
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*'
+
+  NeptuneLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Environment}-NeptuneScoring'
+      RetentionInDays: 7
+
+  NeptuneScoringLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: NeptuneLambdaLogGroup
+    Properties:
+      FunctionName: !Sub '${Environment}-NeptuneScoring'
+      Runtime: python3.11
+      Handler: neptune_scoring.lambda_handler
+      Role: !GetAtt NeptuneScoringLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/neptune_scoring.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          AUDIT_TRAIL_TABLE: !Ref AuditTrailTableName
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneCluster.Endpoint
+          LOG_LEVEL: !Ref LogLevel
+
+Outputs:
+  NeptuneLambdaArn:
+    Value: !GetAtt NeptuneScoringLambda.Arn
+  NeptuneEndpoint:
+    Value: !GetAtt NeptuneCluster.Endpoint
+  VpcId:
+    Value: !Ref NeptuneVPC
+    Description: VPC ID for Neptune cluster
+  PrivateSubnetIds:
+    Value: !Join [',', [!Ref PrivateSubnet1, !Ref PrivateSubnet2]]
+    Description: Private subnet IDs for Neptune cluster
+  NeptuneSecurityGroupId:
+    Value: !Ref NeptuneSecurityGroup
+    Description: Security group ID for Neptune cluster
+  LambdaSecurityGroupId:
+    Value: !Ref LambdaSecurityGroup
+    Description: Security group ID for Lambda functions accessing Neptune

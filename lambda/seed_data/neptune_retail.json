@@ -1,0 +1,91 @@
+{
+  "nodes": [
+    {
+      "id": "CUST-001",
+      "label": "Account",
+      "properties": {
+        "name": "Bob Johnson",
+        "type": "customer",
+        "industry_context": "Retail",
+        "created_date": "2023-06-01"
+      }
+    },
+    {
+      "id": "CUST-002",
+      "label": "Account",
+      "properties": {
+        "name": "Lisa Anderson",
+        "type": "customer",
+        "industry_context": "Retail",
+        "created_date": "2023-07-15"
+      }
+    },
+    {
+      "id": "CUST-003",
+      "label": "Account",
+      "properties": {
+        "name": "David Martinez",
+        "type": "customer",
+        "industry_context": "Retail",
+        "created_date": "2023-08-20"
+      }
+    },
+    {
+      "id": "RISK-REFUND-001",
+      "label": "RiskCluster",
+      "properties": {
+        "cluster_type": "refund_ring",
+        "risk_level": 2,
+        "description": "Coordinated refund abuse pattern detected"
+      }
+    },
+    {
+      "id": "MERCHANT-001",
+      "label": "Entity",
+      "properties": {
+        "name": "Electronics Reseller Network",
+        "entity_type": "merchant"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "CUST-001",
+      "to": "CUST-002",
+      "label": "TRANSACTS_WITH",
+      "properties": {
+        "amount": 12400.00,
+        "timestamp": "2023-12-20T16:45:00Z",
+        "frequency": 2
+      }
+    },
+    {
+      "from": "CUST-002",
+      "to": "MERCHANT-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 7,
+        "last_interaction": "2023-12-18T12:00:00Z"
+      }
+    },
+    {
+      "from": "MERCHANT-001",
+      "to": "RISK-REFUND-001",
+      "label": "ASSOCIATED_WITH",
+      "properties": {
+        "distance": 1,
+        "confidence_score": 0.65
+      }
+    },
+    {
+      "from": "CUST-003",
+      "to": "CUST-001",
+      "label": "TRANSACTS_WITH",
+      "properties": {
+        "amount": 850.00,
+        "timestamp": "2023-12-22T14:30:00Z",
+        "frequency": 1
+      }
+    }
+  ]
+}

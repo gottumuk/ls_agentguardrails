@@ -1,0 +1,34 @@
+{
+  "sensitive_records": [
+    {
+      "record_id": "HEALTH-001",
+      "patient_name": "Jane Doe",
+      "mrn": "MRN-789456",
+      "icd10_codes": ["M79.3", "G89.29"],
+      "prescription_history": ["Oxycodone 30mg", "Hydrocodone 10mg"],
+      "prescribing_md": "Dr. Smith",
+      "last_visit": "2024-01-10",
+      "insurance": "Blue Cross"
+    },
+    {
+      "record_id": "HEALTH-002",
+      "patient_name": "Robert Williams",
+      "mrn": "MRN-456123",
+      "icd10_codes": ["J45.40", "E11.9"],
+      "prescription_history": ["Albuterol inhaler", "Metformin 500mg"],
+      "prescribing_md": "Dr. Johnson",
+      "last_visit": "2024-01-12",
+      "insurance": "Aetna"
+    },
+    {
+      "record_id": "HEALTH-003",
+      "patient_name": "Emily Davis",
+      "mrn": "MRN-321654",
+      "icd10_codes": ["I10", "E78.5"],
+      "prescription_history": ["Lisinopril 10mg", "Atorvastatin 20mg"],
+      "prescribing_md": "Dr. Martinez",
+      "last_visit": "2024-01-11",
+      "insurance": "United Healthcare"
+    }
+  ]
+}

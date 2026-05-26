@@ -1,0 +1,6 @@
+{
+  "apiEndpoint": "PLACEHOLDER_API_ENDPOINT",
+  "websocketEndpoint": "PLACEHOLDER_WEBSOCKET_ENDPOINT",
+  "region": "PLACEHOLDER_REGION",
+  "environment": "staging"
+}

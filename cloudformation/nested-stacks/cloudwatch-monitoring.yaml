@@ -1,0 +1,323 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch Dashboards and Alarms for AWS Agent Governance Demos'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment name (dev, staging, prod)
+  
+  TACTLambdaName:
+    Type: String
+    Description: TACT Evaluation Lambda function name
+  
+  GuardrailsLambdaName:
+    Type: String
+    Description: Guardrails Query Lambda function name
+  
+  NeptuneLambdaName:
+    Type: String
+    Description: Neptune Scoring Lambda function name
+  
+  ApprovalLambdaName:
+    Type: String
+    Description: Approval Workflow Lambda function name
+  
+  AuditTrailTableName:
+    Type: String
+    Description: Audit Trail DynamoDB table name
+  
+  SensitiveRecordsTableName:
+    Type: String
+    Description: Sensitive Records DynamoDB table name
+  
+  WorkflowStateTableName:
+    Type: String
+    Description: Workflow State DynamoDB table name
+  
+  NeptuneClusterId:
+    Type: String
+    Description: Neptune cluster identifier
+  
+  AlarmEmail:
+    Type: String
+    Description: Email address for alarm notifications
+    Default: ''
+
+Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
+
+Resources:
+  # SNS Topic for Alarms
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasAlarmEmail
+    Properties:
+      DisplayName: !Sub '${Environment} - Agent Governance Demos Alarms'
+      Subscription:
+        - Endpoint: !Ref AlarmEmail
+          Protocol: email
+
+  # CloudWatch Dashboard
+  DemoDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${Environment}-AgentGovernanceDemos'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Invocations", {"stat": "Sum", "label": "TACT Invocations"}, {"dimensions": {"FunctionName": "${TACTLambdaName}"}}],
+                  [".", ".", {"stat": "Sum", "label": "Guardrails Invocations"}, {"dimensions": {"FunctionName": "${GuardrailsLambdaName}"}}],
+                  [".", ".", {"stat": "Sum", "label": "Neptune Invocations"}, {"dimensions": {"FunctionName": "${NeptuneLambdaName}"}}],
+                  [".", ".", {"stat": "Sum", "label": "Approval Invocations"}, {"dimensions": {"FunctionName": "${ApprovalLambdaName}"}}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Lambda Invocations",
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Errors", {"stat": "Sum", "label": "TACT Errors"}, {"dimensions": {"FunctionName": "${TACTLambdaName}"}}],
+                  [".", ".", {"stat": "Sum", "label": "Guardrails Errors"}, {"dimensions": {"FunctionName": "${GuardrailsLambdaName}"}}],
+                  [".", ".", {"stat": "Sum", "label": "Neptune Errors"}, {"dimensions": {"FunctionName": "${NeptuneLambdaName}"}}],
+                  [".", ".", {"stat": "Sum", "label": "Approval Errors"}, {"dimensions": {"FunctionName": "${ApprovalLambdaName}"}}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Lambda Errors",
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Duration", {"stat": "Average", "label": "TACT Latency"}, {"dimensions": {"FunctionName": "${TACTLambdaName}"}}],
+                  [".", ".", {"stat": "Average", "label": "Guardrails Latency"}, {"dimensions": {"FunctionName": "${GuardrailsLambdaName}"}}],
+                  [".", ".", {"stat": "Average", "label": "Neptune Latency"}, {"dimensions": {"FunctionName": "${NeptuneLambdaName}"}}],
+                  [".", ".", {"stat": "Average", "label": "Approval Latency"}, {"dimensions": {"FunctionName": "${ApprovalLambdaName}"}}]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "Lambda Latency (ms)",
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/DynamoDB", "UserErrors", {"stat": "Sum"}, {"dimensions": {"TableName": "${AuditTrailTableName}"}}],
+                  [".", "SystemErrors", {"stat": "Sum"}, {"dimensions": {"TableName": "${AuditTrailTableName}"}}],
+                  [".", "ConsumedReadCapacityUnits", {"stat": "Sum"}, {"dimensions": {"TableName": "${AuditTrailTableName}"}}],
+                  [".", "ConsumedWriteCapacityUnits", {"stat": "Sum"}, {"dimensions": {"TableName": "${AuditTrailTableName}"}}]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "DynamoDB - Audit Trail Table",
+                "yAxis": {"left": {"min": 0}}
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Neptune", "MainRequestQueuePendingRequests", {"stat": "Average"}, {"dimensions": {"DBClusterIdentifier": "${NeptuneClusterId}"}}],
+                  [".", "GremlinRequestsPerSec", {"stat": "Average"}, {"dimensions": {"DBClusterIdentifier": "${NeptuneClusterId}"}}],
+                  [".", "GremlinErrors", {"stat": "Sum"}, {"dimensions": {"DBClusterIdentifier": "${NeptuneClusterId}"}}]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "Neptune Cluster Metrics",
+                "yAxis": {"left": {"min": 0}}
+              }
+            }
+          ]
+        }
+
+  # Lambda Error Rate Alarms
+  TACTLambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-TACTLambda-HighErrorRate'
+      AlarmDescription: TACT Lambda error rate exceeds threshold
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref TACTLambdaName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  GuardrailsLambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-GuardrailsLambda-HighErrorRate'
+      AlarmDescription: Guardrails Lambda error rate exceeds threshold
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref GuardrailsLambdaName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  NeptuneLambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-NeptuneLambda-HighErrorRate'
+      AlarmDescription: Neptune Lambda error rate exceeds threshold
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref NeptuneLambdaName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  # DynamoDB Throttling Alarms
+  AuditTrailThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-AuditTrail-Throttling'
+      AlarmDescription: Audit Trail table is being throttled
+      MetricName: UserErrors
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value: !Ref AuditTrailTableName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  SensitiveRecordsThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-SensitiveRecords-Throttling'
+      AlarmDescription: Sensitive Records table is being throttled
+      MetricName: UserErrors
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value: !Ref SensitiveRecordsTableName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  # Neptune Connection Failure Alarm
+  NeptuneConnectionFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-Neptune-ConnectionFailures'
+      AlarmDescription: Neptune cluster connection failures detected
+      MetricName: GremlinErrors
+      Namespace: AWS/Neptune
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !Ref NeptuneClusterId
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  # Lambda Duration Alarms (High Latency)
+  TACTLambdaLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-TACTLambda-HighLatency'
+      AlarmDescription: TACT Lambda latency exceeds 5 seconds
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5000
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref TACTLambdaName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+  NeptuneLambdaLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmEmail
+    Properties:
+      AlarmName: !Sub '${Environment}-NeptuneLambda-HighLatency'
+      AlarmDescription: Neptune Lambda latency exceeds 5 seconds
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5000
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref NeptuneLambdaName
+      AlarmActions:
+        - !Ref AlarmTopic
+      TreatMissingData: notBreaching
+
+Outputs:
+  DashboardURL:
+    Description: CloudWatch Dashboard URL
+    Value: !Sub 'https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${Environment}-AgentGovernanceDemos'
+  
+  AlarmTopicArn:
+    Description: SNS Topic ARN for alarms
+    Value: !If [HasAlarmEmail, !Ref AlarmTopic, '']
+    Export:
+      Name: !Sub '${AWS::StackName}-AlarmTopicArn'

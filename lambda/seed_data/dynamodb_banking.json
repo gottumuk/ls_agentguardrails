@@ -1,0 +1,34 @@
+{
+  "sensitive_records": [
+    {
+      "record_id": "BANK-001",
+      "account_holder": "John Smith",
+      "ssn": "123-45-6789",
+      "account_number": "9876543210",
+      "dob": "1985-03-15",
+      "balance": 47000.00,
+      "last_transaction": "2024-01-15",
+      "account_type": "checking"
+    },
+    {
+      "record_id": "BANK-002",
+      "account_holder": "Sarah Johnson",
+      "ssn": "987-65-4321",
+      "account_number": "1234567890",
+      "dob": "1990-07-22",
+      "balance": 125000.00,
+      "last_transaction": "2024-01-14",
+      "account_type": "savings"
+    },
+    {
+      "record_id": "BANK-003",
+      "account_holder": "Michael Chen",
+      "ssn": "456-78-9012",
+      "account_number": "5555666677",
+      "dob": "1978-11-30",
+      "balance": 8500.00,
+      "last_transaction": "2024-01-16",
+      "account_type": "checking"
+    }
+  ]
+}

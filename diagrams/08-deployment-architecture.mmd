@@ -1,0 +1,57 @@
+graph TB
+    subgraph "Source Control"
+        GIT[GitHub Repository - CloudFormation Templates - Lambda Code - Frontend Code]
+    end
+    
+    subgraph "Build Process"
+        PKG[Package Lambda Functions]
+        BUILD[Build Frontend]
+    end
+    
+    subgraph "Artifact Storage"
+        S3CODE[S3 Bucket - Lambda Code Packages]
+        S3WEB[S3 Bucket - Frontend Static Assets]
+    end
+    
+    subgraph "Infrastructure Deployment"
+        CF[CloudFormation Main Stack]
+        NEST1[Nested Stack: Guardrails Policies]
+        NEST2[Nested Stack: Neptune Demo]
+        NEST3[Nested Stack: Approval Demo]
+        NEST4[Nested Stack: API Gateway]
+    end
+    
+    subgraph "Runtime Resources"
+        LAMBDA[6 Lambda Functions]
+        NEPTUNE[Neptune Cluster]
+        STEPFN[Step Functions State Machine]
+        DYNAMO[3 DynamoDB Tables]
+        APIGW[API Gateway]
+        CLOUDFRONT[CloudFront Distribution]
+    end
+    
+    GIT --> PKG
+    GIT --> BUILD
+    PKG --> S3CODE
+    BUILD --> S3WEB
+    
+    S3CODE --> CF
+    CF --> NEST1
+    CF --> NEST2
+    CF --> NEST3
+    CF --> NEST4
+    
+    NEST1 --> LAMBDA
+    NEST2 --> NEPTUNE
+    NEST3 --> STEPFN
+    NEST4 --> APIGW
+    
+    CF --> DYNAMO
+    CF --> CLOUDFRONT
+    
+    S3WEB --> CLOUDFRONT
+    
+    style GIT fill:#e1f5ff
+    style S3CODE fill:#d4f1d4
+    style S3WEB fill:#d4f1d4
+    style CF fill:#fff4cc

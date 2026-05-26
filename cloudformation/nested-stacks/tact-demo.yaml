@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Demo 1 - TACT Decision Engine'
+
+Parameters:
+  AuditTrailTableName:
+    Type: String
+    Description: Audit Trail DynamoDB table name
+  
+  Environment:
+    Type: String
+    Description: Deployment environment
+  
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda code
+  
+  LambdaMemorySize:
+    Type: Number
+    Description: Lambda memory size in MB
+  
+  LambdaTimeout:
+    Type: Number
+    Description: Lambda timeout in seconds
+  
+  LogLevel:
+    Type: String
+    Description: Logging level
+
+Resources:
+  # IAM Role for TACT Evaluation Lambda
+  TACTEvaluationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - !Sub 'arn:aws:bedrock:*::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*'
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AuditTrailTableName}'
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*'
+
+  # CloudWatch Log Group
+  TACTLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${TACTEvaluationLambda}'
+      RetentionInDays: 7
+
+  # TACT Evaluation Lambda Function
+  TACTEvaluationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.11
+      Handler: tact_evaluation.lambda_handler
+      Role: !GetAtt TACTEvaluationLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/tact_evaluation.zip
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      Environment:
+        Variables:
+          AUDIT_TRAIL_TABLE: !Ref AuditTrailTableName
+          LOG_LEVEL: !Ref LogLevel
+          ENVIRONMENT: !Ref Environment
+          BEDROCK_MODEL_ID: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'  # Claude 4.5 Sonnet via inference profile
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Demo
+          Value: TACT-Engine
+
+Outputs:
+  TACTLambdaArn:
+    Description: TACT Evaluation Lambda ARN
+    Value: !GetAtt TACTEvaluationLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-TACTLambdaArn'
+  
+  TACTLambdaName:
+    Description: TACT Evaluation Lambda function name
+    Value: !Ref TACTEvaluationLambda

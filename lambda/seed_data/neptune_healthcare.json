@@ -1,0 +1,87 @@
+{
+  "nodes": [
+    {
+      "id": "PATIENT-001",
+      "label": "Account",
+      "properties": {
+        "name": "Jane Doe",
+        "type": "patient",
+        "industry_context": "Healthcare",
+        "created_date": "2022-05-10"
+      }
+    },
+    {
+      "id": "PATIENT-002",
+      "label": "Account",
+      "properties": {
+        "name": "Robert Williams",
+        "type": "patient",
+        "industry_context": "Healthcare",
+        "created_date": "2021-08-15"
+      }
+    },
+    {
+      "id": "PROVIDER-001",
+      "label": "Entity",
+      "properties": {
+        "name": "Dr. Smith Clinic",
+        "entity_type": "provider"
+      }
+    },
+    {
+      "id": "RISK-MILL-001",
+      "label": "RiskCluster",
+      "properties": {
+        "cluster_type": "prescription_mill",
+        "risk_level": 3,
+        "description": "Provider with abnormal opioid prescribing patterns"
+      }
+    },
+    {
+      "id": "PHARMACY-001",
+      "label": "Entity",
+      "properties": {
+        "name": "QuickScript Pharmacy",
+        "entity_type": "pharmacy"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "PATIENT-001",
+      "to": "PROVIDER-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 8,
+        "last_interaction": "2024-01-10T11:00:00Z"
+      }
+    },
+    {
+      "from": "PROVIDER-001",
+      "to": "RISK-MILL-001",
+      "label": "ASSOCIATED_WITH",
+      "properties": {
+        "distance": 1,
+        "confidence_score": 0.78
+      }
+    },
+    {
+      "from": "PATIENT-001",
+      "to": "PHARMACY-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 12,
+        "last_interaction": "2024-01-12T15:30:00Z"
+      }
+    },
+    {
+      "from": "PATIENT-002",
+      "to": "PROVIDER-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 3,
+        "last_interaction": "2024-01-12T10:00:00Z"
+      }
+    }
+  ]
+}

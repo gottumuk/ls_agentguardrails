@@ -1,0 +1,42 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "staging"
+  },
+  {
+    "ParameterKey": "TemplateBucket",
+    "ParameterValue": "aws-governance-demos-templates-staging"
+  },
+  {
+    "ParameterKey": "LambdaCodeBucket",
+    "ParameterValue": "aws-governance-demos-lambda-staging"
+  },
+  {
+    "ParameterKey": "LambdaMemorySize",
+    "ParameterValue": "1024"
+  },
+  {
+    "ParameterKey": "LambdaTimeout",
+    "ParameterValue": "10"
+  },
+  {
+    "ParameterKey": "LogLevel",
+    "ParameterValue": "INFO"
+  },
+  {
+    "ParameterKey": "NeptuneMinCapacity",
+    "ParameterValue": "2.5"
+  },
+  {
+    "ParameterKey": "NeptuneMaxCapacity",
+    "ParameterValue": "4.5"
+  },
+  {
+    "ParameterKey": "ApiGatewayRateLimit",
+    "ParameterValue": "100"
+  },
+  {
+    "ParameterKey": "ApiGatewayBurstLimit",
+    "ParameterValue": "200"
+  }
+]

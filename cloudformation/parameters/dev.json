@@ -1,0 +1,42 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "TemplateBucket",
+    "ParameterValue": "aws-governance-demos-templates-dev"
+  },
+  {
+    "ParameterKey": "LambdaCodeBucket",
+    "ParameterValue": "aws-governance-demos-lambda-dev"
+  },
+  {
+    "ParameterKey": "LambdaMemorySize",
+    "ParameterValue": "512"
+  },
+  {
+    "ParameterKey": "LambdaTimeout",
+    "ParameterValue": "10"
+  },
+  {
+    "ParameterKey": "LogLevel",
+    "ParameterValue": "DEBUG"
+  },
+  {
+    "ParameterKey": "NeptuneMinCapacity",
+    "ParameterValue": "2"
+  },
+  {
+    "ParameterKey": "NeptuneMaxCapacity",
+    "ParameterValue": "4"
+  },
+  {
+    "ParameterKey": "ApiGatewayRateLimit",
+    "ParameterValue": "1000"
+  },
+  {
+    "ParameterKey": "ApiGatewayBurstLimit",
+    "ParameterValue": "2000"
+  }
+]

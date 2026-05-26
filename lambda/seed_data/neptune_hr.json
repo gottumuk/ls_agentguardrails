@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {
+      "id": "EMP-001",
+      "label": "Account",
+      "properties": {
+        "name": "Alice Chen",
+        "type": "contractor",
+        "industry_context": "HROperations",
+        "created_date": "2022-06-01"
+      }
+    },
+    {
+      "id": "EMP-002",
+      "label": "Account",
+      "properties": {
+        "name": "James Wilson",
+        "type": "contractor",
+        "industry_context": "HROperations",
+        "created_date": "2021-03-15"
+      }
+    },
+    {
+      "id": "EMP-003",
+      "label": "Account",
+      "properties": {
+        "name": "Maria Garcia",
+        "type": "contractor",
+        "industry_context": "HROperations",
+        "created_date": "2020-09-01"
+      }
+    },
+    {
+      "id": "RISK-LEGAL-001",
+      "label": "RiskCluster",
+      "properties": {
+        "cluster_type": "legal_case",
+        "risk_level": 3,
+        "description": "Active employment litigation case"
+      }
+    },
+    {
+      "id": "DEPT-001",
+      "label": "Entity",
+      "properties": {
+        "name": "APAC Operations",
+        "entity_type": "department"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "EMP-001",
+      "to": "DEPT-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 250,
+        "last_interaction": "2024-01-15T17:00:00Z"
+      }
+    },
+    {
+      "from": "EMP-002",
+      "to": "DEPT-001",
+      "label": "INTERACTS_WITH",
+      "properties": {
+        "interaction_count": 180,
+        "last_interaction": "2024-01-14T16:30:00Z"
+      }
+    },
+    {
+      "from": "DEPT-001",
+      "to": "RISK-LEGAL-001",
+      "label": "ASSOCIATED_WITH",
+      "properties": {
+        "distance": 1,
+        "confidence_score": 0.72
+      }
+    },
+    {
+      "from": "EMP-003",
+      "to": "EMP-001",
+      "label": "TRANSACTS_WITH",
+      "properties": {
+        "amount": 0,
+        "timestamp": "2024-01-16T09:00:00Z",
+        "frequency": 15
+      }
+    }
+  ]
+}

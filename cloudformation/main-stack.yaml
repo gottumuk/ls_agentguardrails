@@ -1,0 +1,365 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Agent Governance Demos - Main Stack'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+    Default: dev
+    Description: Deployment environment
+  
+  TemplateBucket:
+    Type: String
+    Description: S3 bucket containing nested stack templates
+  
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment packages
+  
+  LambdaMemorySize:
+    Type: Number
+    Default: 512
+    Description: Lambda function memory size in MB
+  
+  LambdaTimeout:
+    Type: Number
+    Default: 10
+    Description: Lambda function timeout in seconds
+  
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, WARN, ERROR]
+    Description: Logging level for Lambda functions
+  
+  NeptuneMinCapacity:
+    Type: Number
+    Default: 2.5
+    Description: Neptune Serverless minimum NCUs
+  
+  NeptuneMaxCapacity:
+    Type: Number
+    Default: 4.5
+    Description: Neptune Serverless maximum NCUs
+  
+  ApiGatewayRateLimit:
+    Type: Number
+    Default: 100
+    Description: API Gateway rate limit (requests per minute)
+  
+  ApiGatewayBurstLimit:
+    Type: Number
+    Default: 200
+    Description: API Gateway burst limit
+
+Resources:
+  # Shared DynamoDB Tables
+  AuditTrailTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-AuditTrail'
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: aws-agent-governance-demos
+
+  SensitiveRecordsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-SensitiveRecords'
+      AttributeDefinitions:
+        - AttributeName: record_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: record_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: aws-agent-governance-demos
+
+  WorkflowStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-WorkflowState'
+      AttributeDefinitions:
+        - AttributeName: workflow_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: workflow_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: aws-agent-governance-demos
+
+  # Nested Stack: Demo 1 - TACT Engine
+  TACTDemoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/tact-demo.yaml'
+      Parameters:
+        AuditTrailTableName: !Ref AuditTrailTable
+        Environment: !Ref Environment
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+        LambdaMemorySize: !Ref LambdaMemorySize
+        LambdaTimeout: !Ref LambdaTimeout
+        LogLevel: !Ref LogLevel
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Demo
+          Value: TACT-Engine
+
+  # Nested Stack: Bedrock Guardrails Policies
+  GuardrailsPoliciesStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/guardrails-policies.yaml'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: Guardrails-Policies
+
+  # Nested Stack: Demo 2 - Guardrails
+  GuardrailsDemoStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: GuardrailsPoliciesStack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/guardrails-demo.yaml'
+      Parameters:
+        AuditTrailTableName: !Ref AuditTrailTable
+        SensitiveRecordsTableName: !Ref SensitiveRecordsTable
+        Environment: !Ref Environment
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+        LambdaMemorySize: !Ref LambdaMemorySize
+        LambdaTimeout: !Ref LambdaTimeout
+        LogLevel: !Ref LogLevel
+        BankingGuardrailId: !GetAtt GuardrailsPoliciesStack.Outputs.BankingGuardrailId
+        HealthcareGuardrailId: !GetAtt GuardrailsPoliciesStack.Outputs.HealthcareGuardrailId
+        RetailGuardrailId: !GetAtt GuardrailsPoliciesStack.Outputs.RetailGuardrailId
+        HRGuardrailId: !GetAtt GuardrailsPoliciesStack.Outputs.HRGuardrailId
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Demo
+          Value: Guardrails
+
+  # Nested Stack: Demo 3 - Neptune Trust Graph
+  NeptuneDemoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/neptune-demo.yaml'
+      Parameters:
+        AuditTrailTableName: !Ref AuditTrailTable
+        Environment: !Ref Environment
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+        LambdaMemorySize: 1024
+        LambdaTimeout: !Ref LambdaTimeout
+        LogLevel: !Ref LogLevel
+        NeptuneMinCapacity: !Ref NeptuneMinCapacity
+        NeptuneMaxCapacity: !Ref NeptuneMaxCapacity
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Demo
+          Value: Neptune-Trust-Graph
+
+  # Nested Stack: Demo 4 - Approval Workflow
+  ApprovalDemoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/approval-demo.yaml'
+      Parameters:
+        AuditTrailTableName: !Ref AuditTrailTable
+        WorkflowStateTableName: !Ref WorkflowStateTable
+        Environment: !Ref Environment
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+        LambdaMemorySize: !Ref LambdaMemorySize
+        LambdaTimeout: !Ref LambdaTimeout
+        LogLevel: !Ref LogLevel
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Demo
+          Value: Approval-Workflow
+
+  # Nested Stack: Seed Data
+  SeedDataStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - SensitiveRecordsTable
+      - NeptuneDemoStack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/seed-data.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+        LambdaMemorySize: 1024
+        LambdaTimeout: 300
+        SensitiveRecordsTableName: !Ref SensitiveRecordsTable
+        NeptuneEndpoint: !GetAtt NeptuneDemoStack.Outputs.NeptuneEndpoint
+        NeptunePort: 8182
+        VpcId: !GetAtt NeptuneDemoStack.Outputs.VpcId
+        PrivateSubnetIds: !GetAtt NeptuneDemoStack.Outputs.PrivateSubnetIds
+        NeptuneSecurityGroupId: !GetAtt NeptuneDemoStack.Outputs.NeptuneSecurityGroupId
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: Seed-Data
+
+  # Nested Stack: Observability Layer
+  ObservabilityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/observability.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+        LambdaMemorySize: !Ref LambdaMemorySize
+        LogLevel: !Ref LogLevel
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: Observability
+
+  # # Nested Stack: CloudTrail and Monitoring
+  # CloudTrailStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: !Sub 'https://s3.amazonaws.com/${TemplateBucket}/nested-stacks/cloudtrail.yaml'
+  #     Parameters:
+  #       Environment: !Ref Environment
+  #     Tags:
+  #       - Key: Environment
+  #         Value: !Ref Environment
+  #       - Key: Component
+  #         Value: CloudTrail
+
+  # Nested Stack: API Gateway
+  APIGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/api-gateway.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        RateLimit: !Ref ApiGatewayRateLimit
+        BurstLimit: !Ref ApiGatewayBurstLimit
+        TACTLambdaArn: !GetAtt TACTDemoStack.Outputs.TACTLambdaArn
+        GuardrailsLambdaArn: !GetAtt GuardrailsDemoStack.Outputs.GuardrailsLambdaArn
+        NeptuneLambdaArn: !GetAtt NeptuneDemoStack.Outputs.NeptuneLambdaArn
+        ApprovalLambdaArn: !GetAtt ApprovalDemoStack.Outputs.ApprovalLambdaArn
+        ApprovalDecisionLambdaArn: !GetAtt ApprovalDemoStack.Outputs.ApprovalDecisionLambdaArn
+        WebSocketApiUrl: !GetAtt ObservabilityStack.Outputs.WebSocketApiUrl
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: API-Gateway
+
+  # Nested Stack: Frontend Hosting
+  FrontendHostingStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - AuditTrailTable
+      - SensitiveRecordsTable
+      - WorkflowStateTable
+      - APIGatewayStack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/cloudformation/nested-stacks/frontend-hosting.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        AuditTrailTableArn: !GetAtt AuditTrailTable.Arn
+        SensitiveRecordsTableArn: !GetAtt SensitiveRecordsTable.Arn
+        WorkflowStateTableArn: !GetAtt WorkflowStateTable.Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: Frontend-Hosting
+
+Outputs:
+  AuditTrailTableName:
+    Description: Audit Trail DynamoDB table name
+    Value: !Ref AuditTrailTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AuditTrailTable'
+
+  SensitiveRecordsTableName:
+    Description: Sensitive Records DynamoDB table name
+    Value: !Ref SensitiveRecordsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-SensitiveRecordsTable'
+
+  WorkflowStateTableName:
+    Description: Workflow State DynamoDB table name
+    Value: !Ref WorkflowStateTable
+    Export:
+      Name: !Sub '${AWS::StackName}-WorkflowStateTable'
+
+  ApiGatewayURL:
+    Description: API Gateway REST endpoint
+    Value: !GetAtt APIGatewayStack.Outputs.RestApiUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayURL'
+
+  WebSocketApiURL:
+    Description: API Gateway WebSocket endpoint
+    Value: !GetAtt ObservabilityStack.Outputs.WebSocketApiUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-WebSocketApiURL'
+
+  NeptuneEndpoint:
+    Description: Neptune cluster endpoint
+    Value: !GetAtt NeptuneDemoStack.Outputs.NeptuneEndpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-NeptuneEndpoint'
+
+  FrontendURL:
+    Description: Frontend application URL
+    Value: !GetAtt FrontendHostingStack.Outputs.FrontendURL
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendURL'
+
+  FrontendBucketName:
+    Description: S3 bucket for frontend static files
+    Value: !GetAtt FrontendHostingStack.Outputs.FrontendBucketName
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendBucket'
+
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID
+    Value: !GetAtt FrontendHostingStack.Outputs.CloudFrontDistributionId
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontDistributionId'
+
+  IdentityPoolId:
+    Description: Cognito Identity Pool ID for frontend
+    Value: !GetAtt FrontendHostingStack.Outputs.IdentityPoolId
+    Export:
+      Name: !Sub '${AWS::StackName}-IdentityPoolId'

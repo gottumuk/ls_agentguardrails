@@ -1,0 +1,34 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "staging"
+  },
+  {
+    "ParameterKey": "TemplateBucket",
+    "ParameterValue": "aws-governance-demos-usw2-1773549902"
+  },
+  {
+    "ParameterKey": "LambdaCodeBucket",
+    "ParameterValue": "aws-governance-demos-usw2-1773549902"
+  },
+  {
+    "ParameterKey": "LambdaMemorySize",
+    "ParameterValue": "512"
+  },
+  {
+    "ParameterKey": "LambdaTimeout",
+    "ParameterValue": "30"
+  },
+  {
+    "ParameterKey": "LogLevel",
+    "ParameterValue": "INFO"
+  },
+  {
+    "ParameterKey": "ApiGatewayRateLimit",
+    "ParameterValue": "100"
+  },
+  {
+    "ParameterKey": "ApiGatewayBurstLimit",
+    "ParameterValue": "200"
+  }
+]
