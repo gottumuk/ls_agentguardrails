@@ -58,6 +58,7 @@ frontend/.cache/
 # IDE
 .vscode/
 .idea/
+.kiro/
 *.swp
 *.swo
 *~
