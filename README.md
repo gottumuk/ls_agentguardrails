@@ -41,4 +41,4 @@ See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for full instructions.
 
 ## License
 
-See [DISCLAIMER](DISCLAIMER) for terms of use.
+See [DISCLAIMER](DISCLAIMER.md) for terms of use.
